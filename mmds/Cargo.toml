@@ -1,0 +1,10 @@
+[package]
+name = "mmds"
+version = "0.1.0"
+authors = ["Amazon Firecracker team <firecracker-devel@amazon.com>"]
+edition = "2018"
+
+[dependencies]
+lazy_static = "1"
+serde_json = "1"
+warp = "0.2"

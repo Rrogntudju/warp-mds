@@ -1,0 +1,9 @@
+[package]
+name = "warp-mds"
+version = "0.1.0"
+authors = ["Rrogntudju"]
+edition = "2018"
+
+[dependencies]
+warp = "0.2"
+mmds = {path = "../mmds"} 

@@ -1,7 +1,7 @@
 // Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-use lazy_static::lazy_static ;
+use lazy_static::lazy_static;
 
 pub mod data_store;
 
@@ -9,7 +9,6 @@ use serde_json::{Map, Value};
 use std::sync::{Arc, Mutex};
 
 use data_store::{Error as MmdsError, Mmds};
-
 
 lazy_static! {
     // A static reference to a global Mmds instance. We currently use this for ease of access during
@@ -54,14 +53,15 @@ mod filters {
         warp::path("mds")
             .and(warp::get())
             .and(warp::path::param())
-            .map(|param: String| { MMDS.lock().expect("erreur").get_value(param)} )
+            .and_then(handlers::get_mds_value)
     }
 
-    pub fn solve() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path("solve")
+    pub fn put_mds() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path("mds")
             .and(warp::path::end())
+            .and(warp::put())
             .and(json_body())
-            .and_then(handlers::solve)
+            .and_then(handlers::put_mds)
     }
 
     fn json_body() -> impl Filter<Extract = (String,), Error = warp::Rejection> + Clone {
@@ -70,33 +70,43 @@ mod filters {
 }
 
 mod handlers {
+    use super::*;
     use std::convert::Infallible;
+    use warp::http::{Response, StatusCode};
 
     pub async fn get_mds_value(path: String) -> Result<impl warp::Reply, Infallible> {
-        MMDS.lock().expect("erreur").get_value(param)
-        let solve_result = Sudoku::new().solve(&req.puzzle);
-        let sudoku_response = match solve_result {
-            Ok(solution) => SolveResponse {
-                status: "success".into(),
-                data: solution,
-                message: "".into(),
-            },
-            Err(e) => SolveResponse {
-                status: "fail".into(),
-                data: "".into(),
-                message: format!("{}", e),
+        let value = MMDS
+            .lock()
+            .expect("Failed to build MMDS response due to poisoned lock")
+            .get_value(path);
+        let response = match value {
+            Ok(v) => Response::builder()
+                .status(StatusCode::OK)
+                .body(serde_json::to_string(&v).unwrap()),
+
+            Err(e) => match e {
+                MmdsError::NotFound => Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(format!("{}", MmdsError::NotFound)),
+                MmdsError::UnsupportedValueType => Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(format!("{}", MmdsError::UnsupportedValueType)),
             },
         };
 
-        Ok(warp::reply::json(&sudoku_response))
+        Ok(response)
+    }
+
+    pub async fn put_mds() -> Result<impl warp::Reply, Infallible> {
+        
+        Ok("")
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use serde_json;
     use super::*;
+    use serde_json;
 
     #[test]
     fn test_parse_request() {
@@ -153,7 +163,7 @@ mod tests {
 
         let patch = serde_json::json!({
             "name": {
-                "second": null, 
+                "second": null,
                 "last": "Kennedy"
             },
             "age": "44",
@@ -172,7 +182,7 @@ mod tests {
 
         // Test null value removal from target document.
         assert_eq!(data["name"]["second"], Value::Null);
-    
+
         // Test add value to target document.
         assert_eq!(data["name"]["last"], patch["name"]["last"]);
         assert!(!data["phones"]["home"].is_object());

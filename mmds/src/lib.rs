@@ -45,7 +45,7 @@ pub fn json_patch(target: &mut Value, patch: &Value) {
     }
 }
 
-mod filters {
+pub mod filters {
     use super::*;
     use warp::Filter;
 
@@ -77,7 +77,7 @@ mod filters {
     }
 }
 
-mod handlers {
+pub mod handlers {
     use super::*;
     use std::convert::Infallible;
     use warp::http::{Response, StatusCode};

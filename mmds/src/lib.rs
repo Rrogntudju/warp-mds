@@ -53,7 +53,7 @@ mod filters {
         warp::path("mds")
             .and(warp::get())
             .and(warp::path::param())
-            .and_then(handlers::get_mds_value)
+            .and_then(handlers::get_mds)
     }
 
     pub fn put_mds() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
@@ -64,8 +64,16 @@ mod filters {
             .and_then(handlers::put_mds)
     }
 
+    pub fn patch_mds() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path("mds")
+            .and(warp::path::end())
+            .and(warp::patch())
+            .and(json_body())
+            .and_then(handlers::patch_mds)
+    }
+
     fn json_body() -> impl Filter<Extract = (String,), Error = warp::Rejection> + Clone {
-        warp::body::content_length_limit(150).and(warp::body::json())
+        warp::body::content_length_limit(10240).and(warp::body::json())
     }
 }
 
@@ -74,7 +82,7 @@ mod handlers {
     use std::convert::Infallible;
     use warp::http::{Response, StatusCode};
 
-    pub async fn get_mds_value(path: String) -> Result<impl warp::Reply, Infallible> {
+    pub async fn get_mds(path: String) -> Result<impl warp::Reply, Infallible> {
         let value = MMDS
             .lock()
             .expect("Failed to build MMDS response due to poisoned lock")
@@ -97,7 +105,12 @@ mod handlers {
         Ok(response)
     }
 
-    pub async fn put_mds() -> Result<impl warp::Reply, Infallible> {
+    pub async fn put_mds(json: String) -> Result<impl warp::Reply, Infallible> {
+        
+        Ok("")
+    }
+
+    pub async fn patch_mds(json: String) -> Result<impl warp::Reply, Infallible> {
         
         Ok("")
     }
@@ -196,5 +209,35 @@ mod tests {
             data["phones"]["mobile"]["UK"],
             patch["phones"]["mobile"]["UK"]
         );
+    }
+
+    use warp::test::request;
+    use warp::http::StatusCode;
+
+    #[tokio::test]
+    async fn put_patch_get_ok() {
+        let resp = request()
+            .method("PUT")
+            .path("/mds")
+            .body(r#"{"c1":"12345","c2":"6789"}"#)
+            .reply(&filters::put_mds())
+            .await;
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+        
+        let resp = request()
+            .method("PATCH")
+            .path("/mds")
+            .body(r#"{"c3":"67890"}"#)
+            .reply(&filters::patch_mds())
+            .await;
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+        
+        let resp = request()
+            .method("GET")
+            .path("/mds/c3")
+            .reply(&filters::get_mds())
+            .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.body(), r#"{"c3":"67890"}"#);
     }
 }

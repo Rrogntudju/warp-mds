@@ -52,7 +52,7 @@ pub mod filters {
     pub fn get_mds() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path("mds")
             .and(warp::get())
-            .and(warp::path::param())
+            .and(warp::path::full())
             .and_then(handlers::get_mds)
     }
 
@@ -81,12 +81,14 @@ pub mod handlers {
     use super::*;
     use std::convert::Infallible;
     use warp::http::{Response, StatusCode};
+    use warp::filters::path::FullPath;
 
-    pub async fn get_mds(path: String) -> Result<impl warp::Reply, Infallible> {
+    pub async fn get_mds(fpath: FullPath) -> Result<impl warp::Reply, Infallible> {
+        let path = fpath.as_str().splitn(2, "/mds").collect::<Vec<&str>>()[1]; 
         let result = MMDS
             .lock()
             .expect("Failed to build MMDS response due to poisoned lock")
-            .get_value(path);
+            .get_value(path.to_string());
 
         let response = match result {
             Ok(value) => Response::builder()
@@ -96,7 +98,7 @@ pub mod handlers {
             Err(e) => match e {
                 MmdsError::NotFound => Response::builder()
                     .status(StatusCode::NOT_FOUND)
-                    .body(format!("{}", e)),
+                    .body(format!("{}", e)), 
                 MmdsError::UnsupportedValueType => Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .body(format!("{}", e)),
@@ -248,7 +250,7 @@ mod tests {
         let resp = request()
             .method("PUT")
             .path("/mds")
-            .body(r#"{"c1":"12345","c2":"6789"}"#)
+            .body(r#"{"c0":{"c1":"12345","c2":"6789"}}"#)
             .reply(&filters::put_mds())
             .await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
@@ -256,17 +258,17 @@ mod tests {
         let resp = request()
             .method("PATCH")
             .path("/mds")
-            .body(r#"{"c3":"67890"}"#)
+            .body(r#"{"c0":{"c3":"67890"}}"#)
             .reply(&filters::patch_mds())
             .await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
 
         let resp = request()
             .method("GET")
-            .path("/mds/c3")
+            .path("/mds/c0/c3")
             .reply(&filters::get_mds())
             .await;
         assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(resp.body(), r#"{"c3":"67890"}"#);
+        assert_eq!(resp.body(), r#"["67890"]"#);
     }
 }

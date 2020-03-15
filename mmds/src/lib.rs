@@ -72,7 +72,7 @@ pub mod filters {
             .and_then(handlers::patch_mds)
     }
 
-    fn json_body() -> impl Filter<Extract = (String,), Error = warp::Rejection> + Clone {
+    fn json_body() -> impl Filter<Extract = (Value,), Error = warp::Rejection> + Clone {
         warp::body::content_length_limit(10240).and(warp::body::json())
     }
 }
@@ -83,36 +83,65 @@ pub mod handlers {
     use warp::http::{Response, StatusCode};
 
     pub async fn get_mds(path: String) -> Result<impl warp::Reply, Infallible> {
-        let value = MMDS
+        let result = MMDS
             .lock()
             .expect("Failed to build MMDS response due to poisoned lock")
             .get_value(path);
-        let response = match value {
-            Ok(v) => Response::builder()
+
+        let response = match result {
+            Ok(value) => Response::builder()
                 .status(StatusCode::OK)
-                .body(serde_json::to_string(&v).unwrap()),
+                .body(serde_json::to_string(&value).unwrap()),
 
             Err(e) => match e {
                 MmdsError::NotFound => Response::builder()
                     .status(StatusCode::NOT_FOUND)
-                    .body(format!("{}", MmdsError::NotFound)),
+                    .body(format!("{}", e)),
                 MmdsError::UnsupportedValueType => Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(format!("{}", MmdsError::UnsupportedValueType)),
+                    .body(format!("{}", e)),
             },
         };
 
         Ok(response)
     }
 
-    pub async fn put_mds(json: String) -> Result<impl warp::Reply, Infallible> {
-        
-        Ok("")
+    pub async fn put_mds(data: Value) -> Result<impl warp::Reply, Infallible> {
+        let result = MMDS
+            .lock()
+            .expect("Failed to build MMDS response due to poisoned lock")
+            .put_data(data);
+
+        let response = match result {
+            Ok(()) => Response::builder()
+                .status(StatusCode::NO_CONTENT)
+                .body("".to_string()),
+
+            Err(e) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(format!("{}", e)),
+        };
+
+        Ok(response)
     }
 
-    pub async fn patch_mds(json: String) -> Result<impl warp::Reply, Infallible> {
-        
-        Ok("")
+    pub async fn patch_mds(patch: Value) -> Result<impl warp::Reply, Infallible> {
+        let result = MMDS
+            .lock()
+            .expect("Failed to build MMDS response due to poisoned lock")
+            .patch_data(patch);
+
+        let response = match result {
+            Ok(()) => Response::builder()
+                .status(StatusCode::NO_CONTENT)
+                .body("".to_string()),
+
+            Err(e) => Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(format!("{}", e)),
+        };
+
+        Ok(response)
     }
 }
 
@@ -211,8 +240,8 @@ mod tests {
         );
     }
 
-    use warp::test::request;
     use warp::http::StatusCode;
+    use warp::test::request;
 
     #[tokio::test]
     async fn put_patch_get_ok() {
@@ -223,7 +252,7 @@ mod tests {
             .reply(&filters::put_mds())
             .await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
-        
+
         let resp = request()
             .method("PATCH")
             .path("/mds")
@@ -231,7 +260,7 @@ mod tests {
             .reply(&filters::patch_mds())
             .await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
-        
+
         let resp = request()
             .method("GET")
             .path("/mds/c3")

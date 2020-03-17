@@ -93,7 +93,7 @@ pub mod handlers {
         let response = match result {
             Ok(value) => Response::builder()
                 .status(StatusCode::OK)
-                .body(serde_json::to_string(&value).unwrap()),
+                .body(serde_json::to_string(&value.join("\n")).unwrap()),
 
             Err(e) => match e {
                 MmdsError::NotFound => Response::builder()
@@ -269,6 +269,6 @@ mod tests {
             .reply(&filters::get_mds())
             .await;
         assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(resp.body(), r#"["67890"]"#);
+        assert_eq!(resp.body(), r#""67890""#);
     }
 }

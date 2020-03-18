@@ -273,20 +273,11 @@ mod tests {
 
         let resp = request()
             .method("GET")
-            .path("/mds/c0/c3/1")
+            .path("/mds/c0/c3/0")
             .reply(&filters::get_mds())
             .await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.body(), "67890");
-
-        let resp = request()
-        .method("GET")
-        .path("/mds/c0/c3/1")
-        .reply(&filters::get_mds())
-        .await;
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(resp.body(), "67890");
-
 
     }
 }

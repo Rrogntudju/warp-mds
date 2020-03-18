@@ -93,7 +93,7 @@ pub mod handlers {
         let response = match result {
             Ok(value) => Response::builder()
                 .status(StatusCode::OK)
-                .body(serde_json::to_string(&value.join("\n")).unwrap()),
+                .body(value.join("\n")),
 
             Err(e) => match e {
                 MmdsError::NotFound => Response::builder()
@@ -254,21 +254,39 @@ mod tests {
             .reply(&filters::put_mds())
             .await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
-
+ 
         let resp = request()
             .method("PATCH")
             .path("/mds")
-            .body(r#"{"c0":{"c3":"67890"}}"#)
+            .body(r#"{"c0":{"c3":["67890","a"]}}"#)
             .reply(&filters::patch_mds())
             .await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
 
         let resp = request()
             .method("GET")
-            .path("/mds/c0/c3")
+            .path("/mds/c0")
             .reply(&filters::get_mds())
             .await;
         assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(resp.body(), r#""67890""#);
+        assert_eq!(resp.body(), "c1\nc2\nc3");
+
+        let resp = request()
+            .method("GET")
+            .path("/mds/c0/c3/1")
+            .reply(&filters::get_mds())
+            .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.body(), "67890");
+
+        let resp = request()
+        .method("GET")
+        .path("/mds/c0/c3/1")
+        .reply(&filters::get_mds())
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.body(), "67890");
+
+
     }
 }

@@ -120,7 +120,7 @@ impl Mmds {
                             // If the key corresponds to a dictionary, a "/" is appended
                             // to the key name.
                             if map[&key].is_object() {
-                                key.push_str("/");
+                                key.push('/');
                             }
 
                             ret.push(key);

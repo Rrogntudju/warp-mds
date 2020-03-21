@@ -117,7 +117,7 @@ pub mod handlers {
         let response = match result {
             Ok(()) => Response::builder()
                 .status(StatusCode::NO_CONTENT)
-                .body("".to_string()),
+                .body(String::new()),
 
             Err(e) => Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -136,7 +136,7 @@ pub mod handlers {
         let response = match result {
             Ok(()) => Response::builder()
                 .status(StatusCode::NO_CONTENT)
-                .body("".to_string()),
+                .body(String::new()),
 
             Err(e) => Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)

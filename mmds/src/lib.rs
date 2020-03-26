@@ -278,6 +278,5 @@ mod tests {
             .await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.body(), "67890");
-
     }
 }

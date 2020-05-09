@@ -1,6 +1,6 @@
 // Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-
+#![feature(str_strip)]
 use lazy_static::lazy_static;
 
 pub mod data_store;
@@ -84,7 +84,7 @@ pub mod handlers {
     use warp::filters::path::FullPath;
 
     pub async fn get_mds(fpath: FullPath) -> Result<impl warp::Reply, Infallible> {
-        let path = fpath.as_str().splitn(2, "/mds").collect::<Vec<&str>>()[1]; 
+        let path = fpath.as_str().strip_prefix("/mds").unwrap(); 
         let result = MMDS
             .lock()
             .expect("Failed to build MMDS response due to poisoned lock")

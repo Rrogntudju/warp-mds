@@ -2,19 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 #![feature(str_strip)]
 use lazy_static::lazy_static;
-
-pub mod data_store;
-
 use serde_json::{Map, Value};
 use std::sync::{Arc, Mutex};
-
+mod data_store;
 use data_store::{Error as MmdsError, Mmds};
 
 lazy_static! {
-    // A static reference to a global Mmds instance. We currently use this for ease of access during
-    // prototyping. We'll consider something like passing Arc<Mutex<Mmds>> references to the
-    // appropriate threads in the future.
-    pub static ref MMDS: Arc<Mutex<Mmds>> = Arc::new(Mutex::new(Mmds::default()));
+    static ref MMDS: Arc<Mutex<Mmds>> = Arc::new(Mutex::new(Mmds::default()));
 }
 
 /// Patch provided JSON document (given as `serde_json::Value`) in-place with JSON Merge Patch
@@ -53,6 +47,7 @@ pub mod filters {
         warp::path("mds")
             .and(warp::get())
             .and(warp::path::full())
+            .and(warp::any().map(move || MMDS.clone()))
             .and_then(handlers::get_mds)
     }
 
@@ -61,6 +56,7 @@ pub mod filters {
             .and(warp::path::end())
             .and(warp::put())
             .and(json_body())
+            .and(warp::any().map(move || MMDS.clone()))
             .and_then(handlers::put_mds)
     }
 
@@ -69,6 +65,7 @@ pub mod filters {
             .and(warp::path::end())
             .and(warp::patch())
             .and(json_body())
+            .and(warp::any().map(move || MMDS.clone()))
             .and_then(handlers::patch_mds)
     }
 
@@ -83,9 +80,9 @@ pub mod handlers {
     use warp::http::{Response, StatusCode};
     use warp::filters::path::FullPath;
 
-    pub async fn get_mds(fpath: FullPath) -> Result<impl warp::Reply, Infallible> {
+    pub async fn get_mds(fpath: FullPath, mmds: Arc<Mutex<Mmds>>) -> Result<impl warp::Reply, Infallible> {
         let path = fpath.as_str().strip_prefix("/mds").unwrap(); 
-        let result = MMDS
+        let result = mmds
             .lock()
             .expect("Failed to build MMDS response due to poisoned lock")
             .get_value(path.to_string());
@@ -108,8 +105,8 @@ pub mod handlers {
         Ok(response)
     }
 
-    pub async fn put_mds(data: Value) -> Result<impl warp::Reply, Infallible> {
-        let result = MMDS
+    pub async fn put_mds(data: Value, mmds: Arc<Mutex<Mmds>>) -> Result<impl warp::Reply, Infallible> {
+        let result = mmds
             .lock()
             .expect("Failed to build MMDS response due to poisoned lock")
             .put_data(data);
@@ -127,8 +124,8 @@ pub mod handlers {
         Ok(response)
     }
 
-    pub async fn patch_mds(patch: Value) -> Result<impl warp::Reply, Infallible> {
-        let result = MMDS
+    pub async fn patch_mds(patch: Value, mmds: Arc<Mutex<Mmds>>) -> Result<impl warp::Reply, Infallible> {
+        let result = mmds
             .lock()
             .expect("Failed to build MMDS response due to poisoned lock")
             .patch_data(patch);

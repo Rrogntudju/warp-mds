@@ -41,13 +41,14 @@ pub fn json_patch(target: &mut Value, patch: &Value) {
 
 pub mod filters {
     use super::*;
+    use std::convert::Infallible;
     use warp::Filter;
 
     pub fn get_mds() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path("mds")
             .and(warp::get())
             .and(warp::path::full())
-            .and(warp::any().map(move || MMDS.clone()))
+            .and(clone_mmds())
             .and_then(handlers::get_mds)
     }
 
@@ -56,7 +57,7 @@ pub mod filters {
             .and(warp::path::end())
             .and(warp::put())
             .and(json_body())
-            .and(warp::any().map(move || MMDS.clone()))
+            .and(clone_mmds())
             .and_then(handlers::put_mds)
     }
 
@@ -65,12 +66,16 @@ pub mod filters {
             .and(warp::path::end())
             .and(warp::patch())
             .and(json_body())
-            .and(warp::any().map(move || MMDS.clone()))
+            .and(clone_mmds())
             .and_then(handlers::patch_mds)
     }
 
     fn json_body() -> impl Filter<Extract = (Value,), Error = warp::Rejection> + Clone {
         warp::body::content_length_limit(10240).and(warp::body::json())
+    }
+
+    fn clone_mmds() -> impl Filter<Extract = (Arc<Mutex<Mmds>>,), Error = Infallible> + Clone {
+        warp::any().map(move || MMDS.clone())
     }
 }
 

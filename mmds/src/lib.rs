@@ -1,6 +1,5 @@
 // Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-#![feature(str_strip)]
 use lazy_static::lazy_static;
 use serde_json::{Map, Value};
 use std::sync::{Arc, Mutex};

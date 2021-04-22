@@ -57,12 +57,9 @@ impl Mmds {
         if data.is_string() {
             Ok(())
         } else if let Some(map) = data.as_object() {
-            map.values()
-                .try_for_each(|value| Mmds::check_data_valid(value))
+            map.values().try_for_each(|value| Mmds::check_data_valid(value))
         } else if let Some(array) = data.as_array() {
-            array
-                .iter()
-                .try_for_each(|value| Mmds::check_data_valid(value))
+            array.iter().try_for_each(|value| Mmds::check_data_valid(value))
         } else {
             Err(Error::UnsupportedValueType)
         }
@@ -161,16 +158,14 @@ mod tests {
 
         let mut mmds_json = "{\"meta-data\":{\"iam\":\"dummy\"},\"user-data\":\"1522850095\"}";
 
-        mmds.put_data(serde_json::from_str(mmds_json).unwrap())
-            .unwrap();
+        mmds.put_data(serde_json::from_str(mmds_json).unwrap()).unwrap();
         assert!(mmds.check_data_store_initialized().is_ok());
 
         assert_eq!(mmds.get_data_str(), mmds_json);
 
         // update the user-data field add test that patch works as expected
         let patch_json = "{\"user-data\":\"10\"}";
-        mmds.patch_data(serde_json::from_str(patch_json).unwrap())
-            .unwrap();
+        mmds.patch_data(serde_json::from_str(patch_json).unwrap()).unwrap();
         mmds_json = "{\"meta-data\":{\"iam\":\"dummy\"},\"user-data\":\"10\"}";
         assert_eq!(mmds.get_data_str(), mmds_json);
     }
@@ -197,43 +192,22 @@ mod tests {
         mmds.put_data(data_store).unwrap();
 
         // Test invalid path.
-        assert_eq!(
-            mmds.get_value("/invalid_path".to_string()),
-            Err(Error::NotFound)
-        );
-        assert_eq!(
-            mmds.get_value("/invalid_path/".to_string()),
-            Err(Error::NotFound)
-        );
+        assert_eq!(mmds.get_value("/invalid_path".to_string()), Err(Error::NotFound));
+        assert_eq!(mmds.get_value("/invalid_path/".to_string()), Err(Error::NotFound));
 
         // Test path ends with /; Value is a dictionary.
-        assert_eq!(
-            mmds.get_value("/phones/".to_string()).unwrap(),
-            vec!["home/", "mobile"]
-        );
+        assert_eq!(mmds.get_value("/phones/".to_string()).unwrap(), vec!["home/", "mobile"]);
 
-        assert_eq!(
-            mmds.get_value("/phones/home/".to_string()).unwrap(),
-            vec!["RO", "UK"]
-        );
+        assert_eq!(mmds.get_value("/phones/home/".to_string()).unwrap(), vec!["RO", "UK"]);
 
         // Test path ends with /; Value is a String.
-        assert_eq!(
-            mmds.get_value("/phones/mobile/".to_string()).unwrap(),
-            vec!["+44 2345678"]
-        );
+        assert_eq!(mmds.get_value("/phones/mobile/".to_string()).unwrap(), vec!["+44 2345678"]);
 
         // Test path does NOT end with /; Value is a dictionary.
-        assert_eq!(
-            mmds.get_value("/phones".to_string()).unwrap(),
-            vec!["home/", "mobile"]
-        );
+        assert_eq!(mmds.get_value("/phones".to_string()).unwrap(), vec!["home/", "mobile"]);
 
         // Test path does NOT end with /; Value is a String.
-        assert_eq!(
-            mmds.get_value("/phones/mobile".to_string()).unwrap(),
-            vec!["+44 2345678"]
-        );
+        assert_eq!(mmds.get_value("/phones/mobile".to_string()).unwrap(), vec!["+44 2345678"]);
     }
 
     #[test]
@@ -250,10 +224,7 @@ mod tests {
         mmds.put_data(data_store).unwrap();
 
         // Test path does NOT end with /; Value is a String.
-        assert_eq!(
-            mmds.get_value("/phones/0".to_string()).unwrap(),
-            vec!["+40 1234567"]
-        );
+        assert_eq!(mmds.get_value("/phones/0".to_string()).unwrap(), vec!["+40 1234567"]);
     }
 
     #[test]
@@ -301,9 +272,6 @@ mod tests {
             "age": "43"
         }"#;
         let data_store: Value = serde_json::from_str(data).unwrap();
-        assert_eq!(
-            mmds.patch_data(data_store),
-            Err(Error::UnsupportedValueType)
-        );
+        assert_eq!(mmds.patch_data(data_store), Err(Error::UnsupportedValueType));
     }
 }

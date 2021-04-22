@@ -1,14 +1,12 @@
 // Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-use lazy_static::lazy_static;
 use serde_json::{Map, Value};
-use std::sync::{Arc, Mutex};
+use static_init::dynamic;
 mod data_store;
 use data_store::{Error as MmdsError, Mmds};
 
-lazy_static! {
-    static ref MMDS: Arc<Mutex<Mmds>> = Arc::new(Mutex::new(Mmds::default()));
-}
+#[dynamic]
+static mut MMDS: Mmds = Mmds::default();
 
 /// Patch provided JSON document (given as `serde_json::Value`) in-place with JSON Merge Patch
 /// [RFC 7396](https://tools.ietf.org/html/rfc7396).
@@ -40,15 +38,10 @@ pub fn json_patch(target: &mut Value, patch: &Value) {
 
 pub mod filters {
     use super::*;
-    use std::convert::Infallible;
     use warp::Filter;
 
     pub fn get_mds() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::path("mds")
-            .and(warp::get())
-            .and(warp::path::full())
-            .and(clone_mmds())
-            .and_then(handlers::get_mds)
+        warp::path("mds").and(warp::get()).and(warp::path::full()).and_then(handlers::get_mds)
     }
 
     pub fn put_mds() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
@@ -56,7 +49,6 @@ pub mod filters {
             .and(warp::path::end())
             .and(warp::put())
             .and(json_body())
-            .and(clone_mmds())
             .and_then(handlers::put_mds)
     }
 
@@ -65,83 +57,55 @@ pub mod filters {
             .and(warp::path::end())
             .and(warp::patch())
             .and(json_body())
-            .and(clone_mmds())
             .and_then(handlers::patch_mds)
     }
 
     fn json_body() -> impl Filter<Extract = (Value,), Error = warp::Rejection> + Clone {
         warp::body::content_length_limit(10240).and(warp::body::json())
     }
-
-    fn clone_mmds() -> impl Filter<Extract = (Arc<Mutex<Mmds>>,), Error = Infallible> + Clone {
-        warp::any().map(move || MMDS.clone())
-    }
 }
 
 pub mod handlers {
     use super::*;
     use std::convert::Infallible;
-    use warp::http::{Response, StatusCode};
     use warp::filters::path::FullPath;
+    use warp::http::{Response, StatusCode};
 
-    pub async fn get_mds(fpath: FullPath, mmds: Arc<Mutex<Mmds>>) -> Result<impl warp::Reply, Infallible> {
-        let path = fpath.as_str().strip_prefix("/mds").unwrap(); 
-        let result = mmds
-            .lock()
-            .expect("Failed to build MMDS response due to poisoned lock")
-            .get_value(path.to_string());
+    pub async fn get_mds(fpath: FullPath) -> Result<impl warp::Reply, Infallible> {
+        let path = fpath.as_str().strip_prefix("/mds").unwrap();
+        let result = MMDS.write().get_value(path.to_string());
 
         let response = match result {
-            Ok(value) => Response::builder()
-                .status(StatusCode::OK)
-                .body(value.join("\n")),
+            Ok(value) => Response::builder().status(StatusCode::OK).body(value.join("\n")),
 
             Err(e) => match e {
-                MmdsError::NotFound => Response::builder()
-                    .status(StatusCode::NOT_FOUND)
-                    .body(format!("{}", e)), 
-                MmdsError::UnsupportedValueType => Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(format!("{}", e)),
+                MmdsError::NotFound => Response::builder().status(StatusCode::NOT_FOUND).body(format!("{}", e)),
+                MmdsError::UnsupportedValueType => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(format!("{}", e)),
             },
         };
 
         Ok(response)
     }
 
-    pub async fn put_mds(data: Value, mmds: Arc<Mutex<Mmds>>) -> Result<impl warp::Reply, Infallible> {
-        let result = mmds
-            .lock()
-            .expect("Failed to build MMDS response due to poisoned lock")
-            .put_data(data);
+    pub async fn put_mds(data: Value) -> Result<impl warp::Reply, Infallible> {
+        let result = MMDS.write().put_data(data);
 
         let response = match result {
-            Ok(()) => Response::builder()
-                .status(StatusCode::NO_CONTENT)
-                .body(String::new()),
+            Ok(()) => Response::builder().status(StatusCode::NO_CONTENT).body(String::new()),
 
-            Err(e) => Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(format!("{}", e)),
+            Err(e) => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(format!("{}", e)),
         };
 
         Ok(response)
     }
 
-    pub async fn patch_mds(patch: Value, mmds: Arc<Mutex<Mmds>>) -> Result<impl warp::Reply, Infallible> {
-        let result = mmds
-            .lock()
-            .expect("Failed to build MMDS response due to poisoned lock")
-            .patch_data(patch);
+    pub async fn patch_mds(patch: Value) -> Result<impl warp::Reply, Infallible> {
+        let result = MMDS.write().patch_data(patch);
 
         let response = match result {
-            Ok(()) => Response::builder()
-                .status(StatusCode::NO_CONTENT)
-                .body(String::new()),
+            Ok(()) => Response::builder().status(StatusCode::NO_CONTENT).body(String::new()),
 
-            Err(e) => Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(format!("{}", e)),
+            Err(e) => Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(format!("{}", e)),
         };
 
         Ok(response)
@@ -169,10 +133,7 @@ mod tests {
                 "mobile": "+44 2345678"
             }
         }"#;
-        MMDS.lock()
-            .unwrap()
-            .put_data(serde_json::from_str(data).unwrap())
-            .unwrap();
+        MMDS.write().put_data(serde_json::from_str(data).unwrap()).unwrap();
 
         let data = r#"{
             "name": {
@@ -182,9 +143,7 @@ mod tests {
             "age": 43
         }"#;
         assert_eq!(
-            MMDS.lock()
-                .unwrap()
-                .put_data(serde_json::from_str(data).unwrap()),
+            MMDS.write().put_data(serde_json::from_str(data).unwrap()),
             Err(MmdsError::UnsupportedValueType)
         );
     }
@@ -233,14 +192,8 @@ mod tests {
         assert!(!data["phones"]["home"].is_object());
         assert_eq!(data["phones"]["home"], patch["phones"]["home"]);
         assert!(data["phones"]["mobile"].is_object());
-        assert_eq!(
-            data["phones"]["mobile"]["RO"],
-            patch["phones"]["mobile"]["RO"]
-        );
-        assert_eq!(
-            data["phones"]["mobile"]["UK"],
-            patch["phones"]["mobile"]["UK"]
-        );
+        assert_eq!(data["phones"]["mobile"]["RO"], patch["phones"]["mobile"]["RO"]);
+        assert_eq!(data["phones"]["mobile"]["UK"], patch["phones"]["mobile"]["UK"]);
     }
 
     use warp::http::StatusCode;
@@ -255,7 +208,7 @@ mod tests {
             .reply(&filters::put_mds())
             .await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
- 
+
         let resp = request()
             .method("PATCH")
             .path("/mds")
@@ -264,19 +217,11 @@ mod tests {
             .await;
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
 
-        let resp = request()
-            .method("GET")
-            .path("/mds/c0")
-            .reply(&filters::get_mds())
-            .await;
+        let resp = request().method("GET").path("/mds/c0").reply(&filters::get_mds()).await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.body(), "c1\nc2\nc3");
 
-        let resp = request()
-            .method("GET")
-            .path("/mds/c0/c3/0")
-            .reply(&filters::get_mds())
-            .await;
+        let resp = request().method("GET").path("/mds/c0/c3/0").reply(&filters::get_mds()).await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(resp.body(), "67890");
     }

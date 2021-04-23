@@ -79,6 +79,7 @@ impl Mmds {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn get_data_str(&self) -> String {
         if self.data_store.is_null() {
             return String::from("{}");
